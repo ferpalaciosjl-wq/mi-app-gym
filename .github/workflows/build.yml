@@ -4,6 +4,9 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Esto activa el modo Node.js 24 para que no te salgan más advertencias amarillas
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
     - uses: actions/checkout@v4
@@ -16,7 +19,8 @@ jobs:
     - name: Install Tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y libtool pkg-config autoconf automake scons qemu-user-static abcde locales jidctest libnxt libusb-dev openjdk-17-jdk-headless
+        # Lista corregida y limpia de dependencias para evitar el Error 100
+        sudo apt-get install -y libtool pkg-config autoconf automake scons qemu-user-static locales openjdk-17-jdk-headless libffi-dev libssl-dev
         pip install --upgrade buildozer wheel setuptools "cython<3.0.0" virtualenv
 
     - name: Build with Buildozer
