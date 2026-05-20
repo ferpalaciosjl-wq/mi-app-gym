@@ -19,22 +19,20 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Install Android SDK & NDK 25b
+    - name: Install Android SDK & Tools
       run: |
-        # Instalamos las herramientas del sistema y configuramos el compilador directo
         sudo apt-get update
         sudo apt-get install -y build-essential autoconf automake libtool pkg-config scons qemu-user-static locales libffi-dev libssl-dev
-        pip install --upgrade "kivy" "cython<3.0.0" wheel setuptools virtualenv python-for-android
+        # Forzamos la instalación de Cython y dependencias necesarias para el subproceso
+        pip install --upgrade "Cython<3.0.0" wheel setuptools virtualenv python-for-android kivy
 
     - name: Setup Android Build Tools
       run: |
-        # Descargamos e instalamos el SDK de Android directamente para la API 33 sin intermediarios
         mkdir -p $HOME/android-sdk/cmdline-tools
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
         unzip -q cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
         mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
         
-        # Aceptamos licencias e instalamos plataformas
         export ANDROID_HOME=$HOME/android-sdk
         export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
         yes | sdkmanager --licenses
@@ -43,7 +41,7 @@ jobs:
     - name: Compilar APK con Python-for-Android
       run: |
         export ANDROID_HOME=$HOME/android-sdk
-        # El comando nativo puro que empaqueta tu main.py en una APK vertical de un solo tiro
+        # Agregamos la bandera --use-setup-py para que no intente crear entornos aislados sin Cython
         p4a apk --private . \
           --package=org.ferpalacios.miappgym \
           --name="Mi App Gym" \
@@ -53,7 +51,8 @@ jobs:
           --arch=arm64-v8a \
           --orientation=portrait \
           --android_api=33 \
-          --min-api=21
+          --min-api=21 \
+          --ignore-setup-py
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
