@@ -21,11 +21,35 @@ jobs:
         sudo apt-get install -y libtool pkg-config autoconf automake scons qemu-user-static locales openjdk-17-jdk-headless libffi-dev libssl-dev
         pip install --upgrade buildozer wheel setuptools "cython<3.0.0" virtualenv
 
-    - name: Adjust Buildozer Specification
+    - name: Generate Perfect Buildozer Spec
       run: |
-        # Este comando busca automáticamente en tu archivo .spec y corrige las APIs conflictivas
-        sed -i 's/^android.minapi =.*/android.minapi = 21/' buildozer.spec
-        sed -i 's/^android.api =.*/android.api = 33/' buildozer.spec
+        # Borramos el archivo viejo para que no estorbe
+        rm -f buildozer.spec
+        
+        # Creamos uno nuevo con los parámetros exactos que Android y GitHub necesitan hoy
+        cat << 'EOF' > buildozer.spec
+        [app]
+        title = Mi App Gym
+        package.name = miappgym
+        package.domain = org.ferpalacios
+        source.dir = .
+        source.include_exts = py,png,jpg,kv,atlas,json
+        version = 0.1
+        requirements = python3,kivy
+        orientation = portrait
+        osx.kivy_version = 2.3.0
+        fullscreen = 1
+        
+        android.api = 33
+        android.minapi = 21
+        android.ndk_api = 21
+        android.archs = arm64-v8a, armeabi-v7a
+        android.allow_backup = True
+        
+        [buildozer]
+        log_level = 2
+        warn_on_root = 0
+        EOF
 
     - name: Build with Buildozer
       run: yes | buildozer -v android debug
