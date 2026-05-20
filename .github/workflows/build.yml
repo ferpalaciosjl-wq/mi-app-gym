@@ -3,9 +3,7 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    runs-on: ubuntu-22.04
 
     steps:
     - uses: actions/checkout@v4
@@ -15,11 +13,17 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install Tools
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install Correct Compilation Tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y libtool pkg-config autoconf automake scons qemu-user-static locales openjdk-17-jdk-headless libffi-dev libssl-dev
-        # Instalamos versiones estables específicas para evitar conflictos con el NDK moderno
+        # Forzamos la instalación de autoconf, libtool y parches del sistema para evitar el fallo m4_pattern_allow
+        sudo apt-get install -y build-essential autoconf automake libtool pkg-config scons qemu-user-static locales libffi-dev libssl-dev
         pip install --upgrade "buildozer>=1.5.0" wheel setuptools "cython<3.0.0" virtualenv
 
     - name: Generate Perfect Buildozer Spec
@@ -40,7 +44,6 @@ jobs:
         android.api = 33
         android.minapi = 21
         android.ndk_api = 21
-        # ESTA LÍNEA OBLIGA A USAR UN NDK COMPATIBLE:
         android.ndk = 25b
         android.archs = arm64-v8a, armeabi-v7a
         android.allow_backup = True
@@ -50,8 +53,11 @@ jobs:
         warn_on_root = 0
         EOF
 
-    - name: Build with Buildozer
-      run: yes | buildozer -v android debug
+    - name: Clean and Build with Buildozer
+      run: |
+        # Forzamos una limpieza de cualquier rastro corrupto de autoconf antes de compilar
+        buildozer android clean
+        yes | buildozer -v android debug
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
