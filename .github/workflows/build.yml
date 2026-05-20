@@ -23,8 +23,11 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential autoconf automake libtool pkg-config scons qemu-user-static locales libffi-dev libssl-dev
-        # Forzamos la instalación de Cython y dependencias necesarias para el subproceso
+        # Instalamos Cython afuera
         pip install --upgrade "Cython<3.0.0" wheel setuptools virtualenv python-for-android kivy
+        
+        # TRUCO MÁGICO: Creamos un archivo de restricción para obligar a los entornos internos a usar Cython
+        echo "Cython<3.0.0" > $HOME/constraints.txt
 
     - name: Setup Android Build Tools
       run: |
@@ -41,7 +44,11 @@ jobs:
     - name: Compilar APK con Python-for-Android
       run: |
         export ANDROID_HOME=$HOME/android-sdk
-        # Agregamos la bandera --use-setup-py para que no intente crear entornos aislados sin Cython
+        
+        # Pasamos la variable PIP_CONSTRAINT apuntando a nuestro archivo. 
+        # Esto obliga a p4a a instalar Cython dentro de su entorno aislado.
+        export PIP_CONSTRAINT=$HOME/constraints.txt
+        
         p4a apk --private . \
           --package=org.ferpalacios.miappgym \
           --name="Mi App Gym" \
@@ -53,7 +60,7 @@ jobs:
           --android_api=33 \
           --min-api=21 \
           --ignore-setup-py
-
+          
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
