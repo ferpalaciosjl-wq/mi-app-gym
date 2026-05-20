@@ -8,11 +8,13 @@ from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
 from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.spinner import Spinner
 from kivy.metrics import dp, sp
 from kivy.utils import get_color_from_hex
 from kivy.core.window import Window
+from kivy.graphics import Color, Line, Ellipse, Rectangle
 
-# Forzar redimensionamiento nativo en Android
+# Configuración de ventana para Android
 Window.softinput_mode = 'resize'
 
 RUTINA = {
@@ -43,291 +45,247 @@ DATA_FILE = "progreso_gym.json"
 def cargar_datos():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            try: return json.load(f)
+            except: return {}
     return {}
 
 def guardar_datos(datos):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(datos, f, indent=4, ensure_ascii=False)
 
+# --- WIDGET DE GRÁFICA PERSONALIZADA ---
+class GraficaWidget(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.puntos = []
+        self.labels_x = []
+        
+    def dibujar(self, datos_puntos):
+        self.canvas.after.clear()
+        if not datos_puntos or len(datos_puntos) < 1:
+            return
+
+        with self.canvas.after:
+            # Margen y dimensiones
+            m = dp(40)
+            ancho = self.width - (m * 2)
+            alto = self.height - (m * 2)
+            
+            # Obtener escalas
+            val_y = [p[1] for p in datos_puntos]
+            min_y, max_y = min(val_y), max(val_y)
+            rango_y = (max_y - min_y) if max_y != min_y else 10
+            
+            # Dibujar Cuadrícula de fondo
+            Color(0.2, 0.2, 0.2, 1)
+            for i in range(5):
+                y_line = m + (alto / 4 * i)
+                Line(points=[m, y_line, self.width - m, y_line], width=1)
+
+            # Dibujar Línea de Progreso
+            Color(0.12, 0.53, 0.9, 1) # Azul brillante
+            puntos_canvas = []
+            
+            paso_x = ancho / (len(datos_puntos) - 1) if len(datos_puntos) > 1 else ancho
+            
+            for i, p in enumerate(datos_puntos):
+                x = m + (i * paso_x)
+                y = m + ((p[1] - min_y) / rango_y * alto)
+                puntos_canvas.extend([x, y])
+                
+                # Dibujar punto (Ellipse)
+                Color(1, 0.7, 0, 1) # Naranja/Oro
+                Ellipse(pos=(x - dp(5), y - dp(5)), size=(dp(10), dp(10)))
+                Color(0.12, 0.53, 0.9, 1)
+
+            if len(puntos_canvas) > 2:
+                Line(points=puntos_canvas, width=dp(2), joint='round')
+
+# --- PANTALLAS ---
 
 class MenuScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        layout_centrado = BoxLayout(orientation='vertical', padding=dp(20))
+        layout = BoxLayout(orientation='vertical', padding=dp(20))
+        box = BoxLayout(orientation='vertical', spacing=dp(12), size_hint=(None, None), width=dp(300), height=dp(580))
+        box.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
         
-        box_bloque = BoxLayout(
-            orientation='vertical', 
-            spacing=dp(16), 
-            size_hint=(None, None), 
-            width=dp(320), 
-            height=dp(540)
-        )
-        box_bloque.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
-        
-        box_bloque.add_widget(Label(
-            text="REGISTRO GYM", 
-            font_size=sp(32), 
-            bold=True, 
-            color=get_color_from_hex("#FFFFFF"),
-            size_hint_y=None, 
-            height=dp(70)
-        ))
+        box.add_widget(Label(text="MI PROGRESO", font_size=sp(28), bold=True, height=dp(60), size_hint_y=None))
         
         for dia in RUTINA.keys():
-            btn = Button(
-                text=dia, 
-                size_hint=(1, None), 
-                height=dp(68), 
-                font_size=sp(16),
-                bold=True,
-                background_normal='',
-                background_color=get_color_from_hex("#1E88E5")
-            )
-            btn.bind(on_press=self.ir_a_dia)
-            box_bloque.add_widget(btn)
-            
-        btn_historial = Button(
-            text="Ver Historial / Avances", 
-            size_hint=(1, None), 
-            height=dp(72), 
-            font_size=sp(18),
-            bold=True,
-            background_normal='',
-            background_color=get_color_from_hex("#43A047")
-        )
-        btn_historial.bind(on_press=self.ir_a_historial)
-        box_bloque.add_widget(btn_historial)
+            btn = Button(text=dia, height=dp(60), size_hint_y=None, background_color=get_color_from_hex("#1E88E5"), bold=True)
+            btn.bind(on_press=lambda x, d=dia: self.ir_a_entreno(d))
+            box.add_widget(btn)
         
-        layout_centrado.add_widget(box_bloque)
-        self.add_widget(layout_centrado)
+        box.add_widget(Label(size_hint_y=None, height=dp(10))) # Espacio
+        
+        btn_hist = Button(text="Ver Historial (Tablas)", height=dp(65), size_hint_y=None, background_color=get_color_from_hex("#43A047"), bold=True)
+        btn_hist.bind(on_press=lambda x: setattr(self.manager, 'current', 'historial'))
+        box.add_widget(btn_hist)
+        
+        btn_graph = Button(text="Gráficas de Avance 📈", height=dp(65), size_hint_y=None, background_color=get_color_from_hex("#FB8C00"), bold=True)
+        btn_graph.bind(on_press=lambda x: setattr(self.manager, 'current', 'graficas'))
+        box.add_widget(btn_graph)
+        
+        layout.add_widget(box)
+        self.add_widget(layout)
 
-    def ir_a_dia(self, instance):
-        self.manager.get_screen('entrenamiento').preparar_dia(instance.text)
+    def ir_a_entreno(self, dia):
+        self.manager.get_screen('entrenamiento').preparar_dia(dia)
         self.manager.current = 'entrenamiento'
-        
-    def ir_a_historial(self, instance):
-        self.manager.get_screen('historial').actualizar_historial()
-        self.manager.current = 'historial'
-
 
 class EntrenamientoScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.inputs = {}
         self.dia_actual = ""
+        self.inputs = {}
         
-        self.layout_principal = BoxLayout(orientation='vertical', padding=dp(12), spacing=dp(10))
+        layout = BoxLayout(orientation='vertical', padding=dp(10))
         
-        # CABECERA FIJA
-        box_cabecera = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(55), spacing=dp(10))
-        btn_volver = Button(text="< Volver", size_hint_x=0.3, font_size=sp(15), bold=True, background_color=get_color_from_hex("#E53935"))
-        btn_volver.bind(on_press=self.volver_menu)
-        
-        self.lbl_titulo = Label(text="", font_size=sp(18), size_hint_x=0.4, bold=True, halign='center')
-        
-        btn_guardar = Button(text="Guardar", size_hint_x=0.3, font_size=sp(15), bold=True, background_color=get_color_from_hex("#43A047"))
-        btn_guardar.bind(on_press=self.guardar_entrenamiento)
-        
-        box_cabecera.add_widget(btn_volver)
-        box_cabecera.add_widget(self.lbl_titulo)
-        box_cabecera.add_widget(btn_guardar)
-        self.layout_principal.add_widget(box_cabecera)
-        
-        # PANEL DE MÉTRICAS (Estadísticas de fuerza superiores en tiempo real)
-        self.panel_metricas = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(60), spacing=dp(10), padding=[0, dp(5), 0, dp(5)])
-        self.lbl_volumen_total = Label(text="Volumen Total\n0 kg", font_size=sp(13), halign='center', color=get_color_from_hex("#B0BEC5"))
-        self.lbl_record_fuerza = Label(text="Mejor Marca Histórica\nCargando...", font_size=sp(13), halign='center', color=get_color_from_hex("#FFB300"))
-        self.panel_metricas.add_widget(self.lbl_volumen_total)
-        self.panel_metricas.add_widget(self.lbl_record_fuerza)
-        self.layout_principal.add_widget(self.panel_metricas)
-        
-        # ZONA DESLIZANTE CON CONTENEDOR FLEXIBLE
-        self.scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False, do_scroll_y=True)
-        self.container = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(30))
+        # Barra superior
+        nav = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(5))
+        btn_atras = Button(text="<", size_hint_x=None, width=dp(50), background_color=get_color_from_hex("#E53935"))
+        btn_atras.bind(on_press=self.volver)
+        self.lbl_title = Label(text="Día", bold=True)
+        btn_save = Button(text="Guardar", size_hint_x=None, width=dp(100), background_color=get_color_from_hex("#43A047"))
+        btn_save.bind(on_press=self.guardar)
+        nav.add_widget(btn_atras); nav.add_widget(self.lbl_title); nav.add_widget(btn_save)
+        layout.add_widget(nav)
+
+        self.scroll = ScrollView()
+        self.container = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(20), padding=[0,0,0,dp(400)])
         self.container.bind(minimum_height=self.container.setter('height'))
-        
         self.scroll.add_widget(self.container)
-        self.layout_principal.add_widget(self.scroll)
-        
-        self.add_widget(self.layout_principal)
+        layout.add_widget(self.scroll)
+        self.add_widget(layout)
 
-    def calcular_estadisticas_dia(self, nombre_dia):
-        datos = cargar_datos()
-        max_peso = 0
-        estimado_1rm = 0
-        
-        # Buscar en el historial el peso más alto levantado en los ejercicios de este día
-        ejercicios_del_dia = RUTINA[nombre_dia]
-        for fecha, entrenamientos in datos.items():
-            for ej, series in entrenamientos.items():
-                if ej in ejercicios_del_dia:
-                    for s in series:
-                        p = float(s.get("peso", 0))
-                        r = int(s.get("reps", 0))
-                        if p > max_peso:
-                            max_peso = p
-                        # Fórmula de Epley para calcular el 1RM Máximo Estimado
-                        if r > 1:
-                            uno_rm = p * (1 + r / 30.0)
-                            if uno_rm > estimado_1rm:
-                                estimado_1rm = uno_rm
-                                
-        if max_peso > 0:
-            self.lbl_record_fuerza.text = f"Mejor Marca: {max_peso} kg\nEst. 1RM: {round(estimado_1rm, 1)} kg"
-        else:
-            self.lbl_record_fuerza.text = "Mejor Marca\n-- Sin historial --"
-
-    def actualizar_volumen_tiempo_real(self, *args):
-        volumen_total = 0
-        for ej, series in self.inputs.items():
-            for in_peso, in_reps in series:
-                try:
-                    p = float(in_peso.text) if in_peso.text else 0.0
-                    r = int(in_reps.text) if in_reps.text else 0
-                    volumen_total += (p * r)
-                except ValueError:
-                    continue
-        self.lbl_volumen_total.text = f"Volumen Total\n{round(volumen_total, 1)} kg"
-
-    def preparar_dia(self, nombre_dia):
+    def preparar_dia(self, dia):
+        self.dia_actual = dia
+        self.lbl_title.text = dia.split(":")[0]
         self.container.clear_widgets()
         self.inputs = {}
-        self.dia_actual = nombre_dia
-        self.lbl_titulo.text = nombre_dia.split(":")[0]
         
-        self.calcular_estadisticas_dia(nombre_dia)
-        
-        # Generar las tarjetas de entrada
-        for ej in RUTINA[nombre_dia]:
-            box_ej = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(135), spacing=dp(6))
+        for ej in RUTINA[dia]:
+            box_ej = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(110))
+            box_ej.add_widget(Label(text=ej, bold=True, color=get_color_from_hex("#FFB300"), halign='left', text_size=(dp(280), None)))
             
-            lbl_ej = Label(text=ej, font_size=sp(16), bold=True, color=get_color_from_hex("#FFB300"), size_hint_y=None, height=dp(30), halign='left', valign='middle')
-            lbl_ej.bind(size=lbl_ej.setter('text_size'))
-            box_ej.add_widget(lbl_ej)
-            
-            box_series = BoxLayout(orientation='horizontal', spacing=dp(10), size_hint_y=None, height=dp(95))
+            grid = BoxLayout(orientation='horizontal', spacing=dp(5))
             self.inputs[ej] = []
-            
             for i in range(4):
-                box_serie = BoxLayout(orientation='vertical', spacing=dp(3))
-                box_serie.add_widget(Label(text=f"S{i+1}", font_size=sp(12), bold=True, size_hint_y=None, height=dp(15), color=get_color_from_hex("#90A4AE")))
-                
-                in_peso = TextInput(hint_text="Kg", input_filter='float', multiline=False, font_size=sp(16), padding=[dp(4), dp(8), dp(4), dp(8)], halign='center')
-                in_reps = TextInput(hint_text="Reps", input_filter='int', multiline=False, font_size=sp(16), padding=[dp(4), dp(8), dp(4), dp(8)], halign='center')
-                
-                # Escuchar cambios para actualizar estadísticas de volumen arriba
-                in_peso.bind(text=self.actualizar_volumen_tiempo_real)
-                in_reps.bind(text=self.actualizar_volumen_tiempo_real)
-                
-                box_serie.add_widget(in_peso)
-                box_serie.add_widget(in_reps)
-                box_series.add_widget(box_serie)
-                
-                self.inputs[ej].append((in_peso, in_reps))
-                
-            box_ej.add_widget(box_series)
+                col = BoxLayout(orientation='vertical')
+                in_p = TextInput(hint_text="Kg", multiline=False, input_filter='float', halign='center')
+                in_r = TextInput(hint_text="R", multiline=False, input_filter='int', halign='center')
+                col.add_widget(in_p); col.add_widget(in_r)
+                grid.add_widget(col)
+                self.inputs[ej].append((in_p, in_r))
+            box_ej.add_widget(grid)
             self.container.add_widget(box_ej)
-            
-        # 🚀 EL TRUCO MAESTRO: Bloque invisible gigante al final del scroll para ganarle espacio al teclado
-        espaciador_teclado = BoxLayout(size_hint_y=None, height=dp(420))
-        self.container.add_widget(espaciador_teclado)
 
-    def guardar_entrenamiento(self, instance):
+    def guardar(self, instance):
         datos = cargar_datos()
-        fecha_hoy = datetime.now().strftime("%Y-%m-%d %H:%M")
-        
-        if fecha_hoy not in datos:
-            datos[fecha_hoy] = {}
-            
+        fecha = datetime.now().strftime("%Y-%m-%d %H:%M")
+        datos[fecha] = {}
         for ej, series in self.inputs.items():
-            datos[fecha_hoy][ej] = []
-            for in_peso, in_reps in series:
-                peso = in_peso.text.strip()
-                reps = in_reps.text.strip()
-                if peso or reps:
-                    datos[fecha_hoy][ej].append({"peso": peso or "0", "reps": reps or "0"})
-                    
+            datos[fecha][ej] = []
+            for p, r in series:
+                if p.text and r.text:
+                    datos[fecha][ej].append({"peso": p.text, "reps": r.text})
         guardar_datos(datos)
         self.manager.current = 'menu'
 
-    def volver_menu(self, instance):
-        self.manager.current = 'menu'
+    def volver(self, *args): self.manager.current = 'menu'
 
+class GraficasScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.layout = BoxLayout(orientation='vertical', padding=dp(15), spacing=dp(10))
+        
+        # Selector de ejercicio
+        self.todos_ejercicios = []
+        for lista in RUTINA.values(): self.todos_ejercicios.extend(lista)
+        
+        self.spinner = Spinner(text="Selecciona Ejercicio", values=self.todos_ejercicios, size_hint_y=None, height=dp(50), background_color=get_color_from_hex("#1E88E5"))
+        self.spinner.bind(text=self.actualizar_grafica)
+        
+        self.lbl_info = Label(text="Tendencia de Fuerza Estimada (1RM)", size_hint_y=None, height=dp(30), color=get_color_from_hex("#B0BEC5"))
+        
+        # El widget donde se dibuja
+        self.canvas_grafica = GraficaWidget(size_hint_y=1)
+        
+        btn_back = Button(text="Volver", size_hint_y=None, height=dp(50), background_color=get_color_from_hex("#E53935"))
+        btn_back.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
+        
+        self.layout.add_widget(Label(text="EVOLUCIÓN", font_size=sp(22), bold=True, size_hint_y=None, height=dp(40)))
+        self.layout.add_widget(self.spinner)
+        self.layout.add_widget(self.lbl_info)
+        self.layout.add_widget(self.canvas_grafica)
+        self.layout.add_widget(btn_back)
+        self.add_widget(self.layout)
+
+    def actualizar_grafica(self, spinner, text):
+        datos = cargar_datos()
+        puntos_ejercicio = []
+        
+        # Extraer puntos (Fecha, 1RM Estimado)
+        for fecha in sorted(datos.keys()):
+            if text in datos[fecha]:
+                max_1rm = 0
+                for s in datos[fecha][text]:
+                    p = float(s['peso'])
+                    r = int(s['reps'])
+                    if p > 0:
+                        # Fórmula de Epley: 1RM = Peso * (1 + Reps/30)
+                        uno_rm = p * (1 + r/30.0)
+                        if uno_rm > max_1rm: max_1rm = uno_rm
+                if max_1rm > 0:
+                    puntos_ejercicio.append((fecha, max_1rm))
+        
+        if len(puntos_ejercicio) > 0:
+            self.lbl_info.text = f"Progreso en {text}: {round(puntos_ejercicio[-1][1],1)} kg (1RM)"
+            # Forzar el dibujo en el canvas
+            self.canvas_grafica.dibujar(puntos_ejercicio)
+        else:
+            self.lbl_info.text = "Sin datos registrados para este ejercicio."
 
 class HistorialScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.layout_principal = BoxLayout(orientation='vertical', padding=dp(15), spacing=dp(12))
-        
-        self.scroll = ScrollView(size_hint=(1, 1))
-        self.container = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(18))
+        layout = BoxLayout(orientation='vertical', padding=dp(10))
+        self.container = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(15))
         self.container.bind(minimum_height=self.container.setter('height'))
-        self.scroll.add_widget(self.container)
+        scroll = ScrollView(); scroll.add_widget(self.container)
         
-        self.layout_principal.add_widget(Label(text="Historial de Avances", font_size=sp(24), bold=True, size_hint_y=None, height=dp(50)))
-        self.layout_principal.add_widget(self.scroll)
+        btn_v = Button(text="Volver", size_hint_y=None, height=dp(50), background_color=get_color_from_hex("#E53935"))
+        btn_v.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         
-        btn_volver = Button(text="Volver al Menú", size_hint_y=None, height=dp(60), font_size=sp(16), bold=True, background_color=get_color_from_hex("#E53935"))
-        btn_volver.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
-        self.layout_principal.add_widget(btn_volver)
-        
-        self.add_widget(self.layout_principal)
+        layout.add_widget(Label(text="HISTORIAL", font_size=sp(22), bold=True, size_hint_y=None, height=dp(40)))
+        layout.add_widget(scroll); layout.add_widget(btn_v)
+        self.add_widget(layout)
 
     def actualizar_historial(self):
         self.container.clear_widgets()
         datos = cargar_datos()
-        
-        if not datos:
-            self.container.add_widget(Label(text="No hay entrenamientos guardados aún.", font_size=sp(16), size_hint_y=None, height=dp(40)))
-        else:
-            for fecha in sorted(datos.keys(), reverse=True):
-                # Contenedor tipo Tarjeta para la sesión
-                box_fecha = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(6), padding=dp(10))
-                
-                # Encabezado estilo tabla con color de éxito
-                lbl_fecha = Label(
-                    text=f"📅 Sesión: {fecha}", 
-                    font_size=sp(16), 
-                    bold=True, 
-                    color=get_color_from_hex("#4CAF50"), 
-                    size_hint_y=None, 
-                    height=dp(30),
-                    halign='left'
-                )
-                lbl_fecha.bind(size=lbl_fecha.setter('text_size'))
-                box_fecha.add_widget(lbl_fecha)
-                
-                altura_bloque = dp(35)
-                for ej, series in datos[fecha].items():
-                    if series:
-                        # Crear el formato de tabla limpia para cada ejercicio
-                        texto_series = " | ".join([f"S{i+1}: {s['peso']}kg x {s['reps']}" for i, s in enumerate(series)])
-                        
-                        lbl_ej = Label(
-                            text=f"[b]• {ej}[/b]\n[color=B0BEC5]  {texto_series}[/color]", 
-                            font_size=sp(14), 
-                            halign='left', 
-                            size_hint_y=None, 
-                            height=dp(50),
-                            markup=True # Permite usar negritas y colores personalizados en el texto
-                        )
-                        lbl_ej.bind(size=lbl_ej.setter('text_size'))
-                        box_fecha.add_widget(lbl_ej)
-                        altura_bloque += dp(52)
-                
-                box_fecha.height = altura_bloque
-                self.container.add_widget(box_fecha)
+        for fecha in sorted(datos.keys(), reverse=True):
+            box = BoxLayout(orientation='vertical', size_hint_y=None, padding=dp(10))
+            box.add_widget(Label(text=f"FECHA: {fecha}", bold=True, color=get_color_from_hex("#4CAF50"), size_hint_y=None, height=dp(25), halign='left', text_size=(dp(300), None)))
+            h = dp(30)
+            for ej, series in datos[fecha].items():
+                if series:
+                    txt = " | ".join([f"{s['peso']}x{s['reps']}" for s in series])
+                    l = Label(text=f"[b]{ej}[/b]: {txt}", markup=True, size_hint_y=None, height=dp(40), halign='left', text_size=(dp(300), None))
+                    box.add_widget(l); h += dp(40)
+            box.height = h
+            self.container.add_widget(box)
 
-
-class RutinaGymApp(App):
+class MainApp(App):
     def build(self):
         sm = ScreenManager()
         Window.clearcolor = get_color_from_hex("#121212")
         sm.add_widget(MenuScreen(name='menu'))
         sm.add_widget(EntrenamientoScreen(name='entrenamiento'))
         sm.add_widget(HistorialScreen(name='historial'))
+        sm.add_widget(GraficasScreen(name='graficas'))
         return sm
 
 if __name__ == '__main__':
-    RutinaGymApp().run()
+    MainApp().run()
