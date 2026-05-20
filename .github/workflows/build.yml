@@ -5,7 +5,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Esto activa el modo Node.js 24 para que no te salgan más advertencias amarillas
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
@@ -19,9 +18,14 @@ jobs:
     - name: Install Tools
       run: |
         sudo apt-get update
-        # Lista corregida y limpia de dependencias para evitar el Error 100
         sudo apt-get install -y libtool pkg-config autoconf automake scons qemu-user-static locales openjdk-17-jdk-headless libffi-dev libssl-dev
         pip install --upgrade buildozer wheel setuptools "cython<3.0.0" virtualenv
+
+    - name: Adjust Buildozer Specification
+      run: |
+        # Este comando busca automáticamente en tu archivo .spec y corrige las APIs conflictivas
+        sed -i 's/^android.minapi =.*/android.minapi = 21/' buildozer.spec
+        sed -i 's/^android.api =.*/android.api = 33/' buildozer.spec
 
     - name: Build with Buildozer
       run: yes | buildozer -v android debug
