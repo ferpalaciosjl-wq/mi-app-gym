@@ -19,48 +19,44 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Install Correct Compilation Tools
+    - name: Install Android SDK & NDK 25b
       run: |
+        # Instalamos las herramientas del sistema y configuramos el compilador directo
         sudo apt-get update
-        # Forzamos la instalación de autoconf, libtool y parches del sistema para evitar el fallo m4_pattern_allow
         sudo apt-get install -y build-essential autoconf automake libtool pkg-config scons qemu-user-static locales libffi-dev libssl-dev
-        pip install --upgrade "buildozer>=1.5.0" wheel setuptools "cython<3.0.0" virtualenv
+        pip install --upgrade "kivy" "cython<3.0.0" wheel setuptools virtualenv python-for-android
 
-    - name: Generate Perfect Buildozer Spec
+    - name: Setup Android Build Tools
       run: |
-        rm -f buildozer.spec
-        cat << 'EOF' > buildozer.spec
-        [app]
-        title = Mi App Gym
-        package.name = miappgym
-        package.domain = org.ferpalacios
-        source.dir = .
-        source.include_exts = py,png,jpg,kv,atlas,json
-        version = 0.1
-        requirements = python3,kivy
-        orientation = portrait
-        fullscreen = 1
+        # Descargamos e instalamos el SDK de Android directamente para la API 33 sin intermediarios
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+        unzip -q cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
+        mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
         
-        android.api = 33
-        android.minapi = 21
-        android.ndk_api = 21
-        android.ndk = 25b
-        android.archs = arm64-v8a, armeabi-v7a
-        android.allow_backup = True
-        
-        [buildozer]
-        log_level = 2
-        warn_on_root = 0
-        EOF
+        # Aceptamos licencias e instalamos plataformas
+        export ANDROID_HOME=$HOME/android-sdk
+        export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+        yes | sdkmanager --licenses
+        sdkmanager "platforms;android-33" "build-tools;33.0.2" "platform-tools"
 
-    - name: Clean and Build with Buildozer
+    - name: Compilar APK con Python-for-Android
       run: |
-        # Forzamos una limpieza de cualquier rastro corrupto de autoconf antes de compilar
-        buildozer android clean
-        yes | buildozer -v android debug
+        export ANDROID_HOME=$HOME/android-sdk
+        # El comando nativo puro que empaqueta tu main.py en una APK vertical de un solo tiro
+        p4a apk --private . \
+          --package=org.ferpalacios.miappgym \
+          --name="Mi App Gym" \
+          --version=0.1 \
+          --bootstrap=sdl2 \
+          --requirements=python3,kivy \
+          --arch=arm64-v8a \
+          --orientation=portrait \
+          --android_api=33 \
+          --min-api=21
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: MiAppGimnasio
-        path: bin/*.apk
+        path: "*.apk"
