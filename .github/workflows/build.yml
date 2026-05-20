@@ -1,0 +1,29 @@
+name: Build APK
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libtool pkg-config autoconf automake scons qemu-user-static abcde locales jidctest libnxt libusb-dev openjdk-17-jdk-headless
+        pip install --upgrade buildozer wheel setuptools "cython<3.0.0" virtualenv
+
+    - name: Build with Buildozer
+      run: yes | buildozer -v android debug
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: MiAppGimnasio
+        path: bin/*.apk
