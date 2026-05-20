@@ -19,14 +19,12 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libtool pkg-config autoconf automake scons qemu-user-static locales openjdk-17-jdk-headless libffi-dev libssl-dev
-        pip install --upgrade buildozer wheel setuptools "cython<3.0.0" virtualenv
+        # Instalamos versiones estables específicas para evitar conflictos con el NDK moderno
+        pip install --upgrade "buildozer>=1.5.0" wheel setuptools "cython<3.0.0" virtualenv
 
     - name: Generate Perfect Buildozer Spec
       run: |
-        # Borramos el archivo viejo para que no estorbe
         rm -f buildozer.spec
-        
-        # Creamos uno nuevo con los parámetros exactos que Android y GitHub necesitan hoy
         cat << 'EOF' > buildozer.spec
         [app]
         title = Mi App Gym
@@ -37,12 +35,13 @@ jobs:
         version = 0.1
         requirements = python3,kivy
         orientation = portrait
-        osx.kivy_version = 2.3.0
         fullscreen = 1
         
         android.api = 33
         android.minapi = 21
         android.ndk_api = 21
+        # ESTA LÍNEA OBLIGA A USAR UN NDK COMPATIBLE:
+        android.ndk = 25b
         android.archs = arm64-v8a, armeabi-v7a
         android.allow_backup = True
         
