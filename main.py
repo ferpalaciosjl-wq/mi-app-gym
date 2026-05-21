@@ -15,13 +15,13 @@ from kivy.core.window import Window
 from kivy.clock import Clock
 from kivy.graphics import Color, Line, Ellipse
 
-# Configuración estricta de pantalla y teclado nativo para Android
+# Configuración estricta de pantalla y redimensionamiento de teclado para Android
 Window.softinput_mode = 'resize'
 
 DATA_FILE = "progreso_gym.json"
 CONFIG_FILE = "config_rutina.json"
 
-# Formato de texto universal sin emojis para garantizar compatibilidad con pantallas Android
+# Cambiamos los emojis gráficos por selectores universales ASCII [>] legibles en cualquier Android
 RUTINA_PREDETERMINADA = {
     "[>] Día 1: Pecho, Hombro y Tríceps": [
         "Press Plano con mancuernas", "Cruces de aperturas en polea alta", 
@@ -45,7 +45,7 @@ RUTINA_PREDETERMINADA = {
     ]
 }
 
-# Rutas de almacenamiento seguro en subcarpetas del sistema Android
+# Funciones de rutas nativas protegidas para evitar bloqueos de almacenamiento en Android
 def get_base_path():
     try:
         from android.storage import app_storage_path
@@ -176,7 +176,7 @@ class EntrenamientoScreen(Screen):
         layout.add_widget(nav)
         self.scroll = ScrollView()
         
-        # Almohadilla inferior dp(420) para ganarle espacio al teclado táctil
+        # Almohadilla inferior de espacio dp(420) para que el teclado nunca tape los inputs superiores
         self.container = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(20), padding=[0,0,0,dp(420)])
         self.container.bind(minimum_height=self.container.setter('height'))
         self.scroll.add_widget(self.container); layout.add_widget(self.scroll)
@@ -293,7 +293,6 @@ class EditarRutinaScreen(Screen):
             rutinas[dia] = [inp.text.strip() for inp in self.inputs_ejercicios if inp.text.strip()]
             guardar_rutinas(rutinas)
         self.manager.current = 'menu'
-
 
 class GraficasScreen(Screen):
     def on_enter(self, *args):
