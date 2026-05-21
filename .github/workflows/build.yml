@@ -67,3 +67,4 @@ jobs:
       with:
         name: MiAppGimnasio
         path: bin/*.apk
+#patatus
