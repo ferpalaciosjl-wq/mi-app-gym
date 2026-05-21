@@ -3,7 +3,6 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    # Usamos Ubuntu 22.04 que tiene las librerías estables perfectas
     runs-on: ubuntu-22.04
 
     steps:
@@ -12,7 +11,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # Usamos Python 3.10 para congelar el entorno y evitar que busque Python 3.14
+        python-version: '3.10'
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -24,7 +23,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential autoconf automake libtool pkg-config scons qemu-user-static locales libffi-dev libssl-dev zip unzip
-        # Instalamos versiones específicas y congeladas del ecosistema Kivy
         pip install "cython>=0.29.33,<3.0.0" wheel setuptools==65.5.0 "buildozer==1.5.0" virtualenv
 
     - name: Generate Perfect Buildozer Spec
@@ -39,11 +37,13 @@ jobs:
         source.include_exts = py,png,jpg,kv,atlas,json
         version = 0.1
         
-        # Forzamos a que p4a use exactamente Python 3.10 y Kivy estable
         requirements = python3==3.10.11,kivy==2.3.0,hostpython3==3.10.11
         
         orientation = portrait
         fullscreen = 1
+        
+        # 🔑 PERMISOS CRÍTICOS: Esto le da permiso a la app para conectarse a GitHub
+        android.permissions = INTERNET
         
         android.api = 33
         android.minapi = 21
@@ -59,7 +59,6 @@ jobs:
 
     - name: Build with Buildozer
       run: |
-        # Esto previene errores de rutas en la máquina virtual de GitHub
         export PATH=$PATH:$HOME/.local/bin
         yes | buildozer -v android debug
 
